@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet " />
+    <title>File upload demo</title> 
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+		var btn = document.querySelector('#btn'); 
+		btn.onclick = function(){
+		
+  // Fetch data for '/get_uploads'
+  fetch('/get_uploads')
+    .then((response) => response.text())
+    .then((responseText) => {
+      document.getElementById('img-container').innerHTML = responseText;
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+		});
+	</script>
+</head>
+<body>
+<div class="panel well">
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="recfile" />
+
+        <input type="submit">
+    </form>
+</div> 
+
+<div class="panel">
+<button class="btn btn-lg btn-success" id="btn">View uploads!</button>
+<div id="img-container">
+</div>
+</div>
+</body>
+</html>

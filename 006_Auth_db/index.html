@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet " />
+    <title>Log in</title> 
+    <script>
+       // window.onload = function() { 
+		
+			document.addEventListener('DOMContentLoaded', function () {
+  // Fetch data for '/all'
+  fetch('/all')
+    .then((response) => response.text())
+    .then((responseText) => {
+      document.getElementById('container').innerHTML = responseText;
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+
+  // Handle login button click
+  const btn = document.getElementById('btn');
+  const usernameInput = document.getElementById('login');
+  const passwordInput = document.getElementById('password');
+
+  btn.addEventListener('click', async () => {
+    try {
+      const userData = {
+        username: usernameInput.value,
+        password: passwordInput.value,
+      };
+
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (response.ok) {
+        alert('user successfully logged in!');
+       // window.location.href = '/dashboard';
+      } else {
+        throw new Error('Error logging in');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Server error! Please try again later.');
+    }
+  });
+
+  // Handle logout button click
+  const btn2 = document.getElementById('btn2');
+  btn2.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/logout');
+      const logoutMessage = await response.text();
+      alert(logoutMessage);
+    } catch (error) {
+      console.error(error);
+      alert('Server error! Please try again later.');
+    }
+  });
+
+  // Handle other button clicks
+  const btns = document.querySelector('.btns');
+  btns.addEventListener('click', async (e) => {
+    if (e.target.dataset.page) {
+      const target = e.target.dataset.page;
+      try {
+        const response = await fetch(`/${target}`);
+        window.location.href = `/${target}`;
+      } catch (error) {
+        console.error(error);
+        alert('Server error! Please try again later.');
+      }
+    }
+  });
+});
+
+    </script>
+</head>
+<body>
+ 
+    <div class="panel well" style="width: 350px; padding: 25px; text-align: center">
+    <h2 style="margin-bottom: 35px">Log in</h2>
+        <form name="login">
+            <div class="form-group">
+               <label>Username</label> <input class="form-control input-lg" type="text" id="login" />
+            </div>
+            <div class="form-group">
+                <label>Password</label> <input class="form-control input-lg" type="text" id="password" />
+            </div>
+            <div class="form-group">
+                <input type="button" value="Log in" class="btn btn-lg btn-success" id="btn" />
+				<button value="Log out" class="btn btn-lg btn-danger" id="btn2">Log out</button> 
+            </div>
+        </form>
+    </div> 
+	<div class="panel">
+	<h1>Registered users: </h1>
+	<div id="container"></div>
+	</div> 
+	<div class="panel btns">
+	<h2>Pages: </h2> 
+	<button data-page="admin" class="btn btn-info btn-lg">Admin page</button>
+	<button data-page="user" class="btn btn-success btn-lg">User page</button>
+	<button data-page="guest" class="btn btn-warning btn-lg">Guest page</button>
+	</div>
+</body>
+</html>
