@@ -1,4 +1,4 @@
-function authenticationMiddleware () {
+export default function authenticationMiddleware () {
   return function (req, res, next) {
     if (req.isAuthenticated()) {
       return next()
@@ -7,4 +7,3 @@ function authenticationMiddleware () {
   }
 }
 
-module.exports = authenticationMiddleware

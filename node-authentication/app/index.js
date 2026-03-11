@@ -1,74 +1,88 @@
-const path = require('path');
-const express = require('express');
-const exphbs = require('express-handlebars');
-const bodyParser = require('body-parser');
-const passport = require('passport');
-const session = require('express-session');
-const MongoStore = require('connect-mongo'); // Використання MongoDB для зберігання сесій
-const mongoose = require('mongoose');
-const flash = require('connect-flash');
+import path from 'path';
+import { fileURLToPath } from 'url';
+import express from 'express';
+import exphbs from 'express-handlebars';
+import passport from 'passport';
+import session from 'express-session';
+import MongoStore from 'connect-mongo';
+import mongoose from 'mongoose';
+import flash from 'connect-flash';
 
-const config = require('../config');
+// Імпорт конфігурації (додайте .js, якщо це локальний файл)
+import config from '../config/index.js';
+
+// Імпорт ініціалізаторів модулів
+import { init as initAuth } from './authentication/index.js';
+import { init as initUser } from './user/index.js';
+import { init as initNote } from './note/index.js';
+
 const app = express();
 
-// Перевірка наявності необхідних змінних середовища
+// Емуляція __dirname для ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Перевірка конфігурації
 if (!config.mongoURI) {
-  throw new Error("MongoDB URI не вказано у конфігурації");
+    throw new Error("MongoDB URI не вказано у конфігурації");
 }
 if (!config.sessionSecret) {
-  throw new Error("Секретний ключ сесії не вказано у конфігурації");
+    throw new Error("Секретний ключ сесії не вказано у конфігурації");
 }
 
 // Підключення до MongoDB
-mongoose.connect(config.mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log('MongoDB підключено'))
-  .catch(err => {
-    console.error('Помилка підключення до MongoDB:', err);
-    process.exit(1); // Завершення процесу у разі помилки підключення
-  });
+mongoose.connect(config.mongoURI)
+    .then(() => console.log('MongoDB підключено'))
+    .catch(err => {
+        console.error('Помилка підключення до MongoDB:', err);
+        process.exit(1);
+    });
 
-// Налаштування body-parser для обробки запитів
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json()); // Додано підтримку JSON-запитів
+// Обробка тіла запиту (замість bodyParser використовуємо вбудований express)
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
 
 // Ініціалізація аутентифікації
-require('./authentication').init(app);
+initAuth(app);
 
-// Налаштування сесій із використанням MongoDB
+// Налаштування сесій із збереженням у MongoDB
 app.use(session({
-  store: MongoStore.create({ mongoUrl: config.mongoURI }), // Використання MongoDB для збереження сесій
-  secret: config.sessionSecret, // Секретний ключ для підпису сесій
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 60 * 24 } // Додано налаштування cookie
+    store: MongoStore.create({ mongoUrl: config.mongoURI }),
+    secret: config.sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // встановіть true, якщо використовуєте HTTPS
+        httpOnly: true, 
+        maxAge: 1000 * 60 * 60 * 24 
+    }
 }));
 
-app.use(flash()); // Підключення flash-повідомлень
-// Middleware для додавання flash-повідомлень у `res.locals`
+app.use(flash());
+
+// Middleware для передачі flash-повідомлень у шаблони
 app.use((req, res, next) => {
-  res.locals.messages = req.flash();
-  next();
+    res.locals.messages = req.flash();
+    next();
 });
 
-// Ініціалізація Passport.js для автентифікації
+// Ініціалізація Passport.js
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Налаштування Handlebars як шаблонізатора
-app.engine('.hbs', exphbs.engine({ // Використання `exphbs.engine` для нових версій
-  defaultLayout: 'layout',
-  extname: '.hbs',
-  layoutsDir: path.join(__dirname, '/'), // Виправлено шлях до папки layouts
-  partialsDir: path.join(__dirname, '/partials') // Виправлено шлях до папки partials
+// Налаштування Handlebars
+app.engine('.hbs', exphbs.engine({
+    defaultLayout: 'layout',
+    extname: '.hbs',
+    layoutsDir: path.join(__dirname, '/'),
+    partialsDir: path.join(__dirname, '/partials')
 }));
 
 app.set('view engine', '.hbs');
 app.set('views', path.join(__dirname, '/'));
 
-// Ініціалізація модулів для роботи з користувачами та нотатками
-require('./user').init(app);
-require('./note').init(app);
+// Ініціалізація модулів користувачів та нотаток
+initUser(app);
+initNote(app);
 
-module.exports = app;
+export default app;

@@ -1,3 +1,5 @@
-module.exports = {
-  init: require('./init')
-}
+import  initNote  from './init.js';
+
+export {
+    initNote as init
+};

@@ -1,9 +1,13 @@
-var crypto = require('crypto');
+import crypto from 'crypto';
 
-module.exports = {
-    
-    encrypt_pass: function (password) {
-        var hash = crypto.createHmac('sha1', 'abc').update(password).digest('hex'); 
-        return hash;
-    } 
-}
+/**
+ * Хеширует пароль с использованием HMAC-SHA1
+ * @param {string} password 
+ * @returns {string}
+ */
+export const encrypt_pass = (password) => {
+    return crypto
+        .createHmac('sha1', 'abc')
+        .update(password)
+        .digest('hex');
+};

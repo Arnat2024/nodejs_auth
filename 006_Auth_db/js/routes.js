@@ -1,38 +1,40 @@
-module.exports = function (app) {
-	app.get('/logout', function(req, res) {
-		req.session.username = '';
-		console.log('logged out'); 
-		res.send('logged out!');  
-	}); 
+/**
+ * Модуль маршрутизації додатку
+ * @param {import('express').Express} app 
+ */
+export default function (app) {
+    
+    // Вихід із системи
+    app.get('/logout', (req, res) => {
+        req.session.username = '';
+        console.log('Користувач вийшов із системи'); 
+        res.send('Ви вийшли із системи!');  
+    }); 
 
-	// ограничение доступа к контенту на основе авторизации 
-	app.get('/admin', function (req, res) {
-		// страница доступна только для админа 
-		if (req.session.username == 'admin') {
-			console.log(req.session.username + ' requested admin page');
-			res.render('admin_page');
-		} else {
-			res.status(403).send('Access Denied!');
-		}
+    // Обмеження доступу до контенту на основі авторизації 
+    app.get('/admin', (req, res) => {
+        // Сторінка доступна тільки для адміна 
+        if (req.session.username === 'admin') {
+            console.log(`${req.session.username} запитав сторінку адміністратора`);
+            res.render('admin_page');
+        } else {
+            res.status(403).send('Доступ заборонено (тільки для admin)!');
+        }
+    }); 
 
-	}); 
+    app.get('/user', (req, res) => {
+        // Сторінка доступна для будь-якого авторизованого користувача 
+        const name = req.session.username || "";
+        if (name.length > 0) {
+            console.log(`${req.session.username} запитав сторінку користувача`);
+            res.render('user_page');
+        } else {
+            res.status(403).send('Доступ заборонено! Будь ласка, увійдіть у систему.');
+        }
+    });
 
-	app.get('/user', function (req, res) {
-
-		// страница доступна для любого залогиненного пользователя 
-		if (req.session.username.length > 0) {
-			console.log(req.session.username + ' requested user page');
-			res.render('user_page');
-		} else {
-			res.status(403).send('Access Denied!');
-		}
-
-	});
-
-	app.get('/guest', function (req, res) {
-
-		// страница без ограничения доступа 
-		res.render('guest_page'); 
-	})
+    app.get('/guest', (req, res) => {
+        // Сторінка без обмеження доступу 
+        res.render('guest_page'); 
+    });
 }
-

@@ -1,22 +1,29 @@
-const express = require('express');
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Імпорт власних модулів (обов'язково з розширенням .js)
+import { createStore } from './js/session_handler.js';
+import * as handlers from './js/queries.js';
+import routes_handler from './js/routes.js';
+
 const app = express();
-
-const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const bodyParser = require('body-parser');
-const path = require('path');
-
-const jsonParser = bodyParser.json();
-app.use(jsonParser);
-
 const port = 8080;
 
+// Емуляція __dirname для ES-модулів
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// создание хранилища для сессий 
-const sessionHandler = require('./js/session_handler');
-const store = sessionHandler.createStore();
+// Налаштування body-parser (тепер вбудовано в express)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// создание сессии 
+// Створення сховища для сесій
+const store = createStore();
+
+// Налаштування сесій
 app.use(cookieParser());
 app.use(session({
     store: store,
@@ -25,38 +32,38 @@ app.use(session({
     secret: 'supersecret'
 }));
 
-const handlers = require('./js/queries');
-//const signup = require('./js/signup');
-const routes_handler = require('./js/routes')(app);
-
+// Налаштування шаблонізатора
 app.set('views', path.join(__dirname, 'pages'));
 app.set('view engine', 'ejs');
 
-app.get('/', function (req, res) {
+// Ініціалізація роутів (якщо ваш routes.js експортує функцію за замовчуванням)
+routes_handler(app);
+
+// Маршрути (Routes)
+app.get('/', (req, res) => {
     res.render('sign_up');
 });
 
-app.get('/login', function (req, res) {
+app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
+
 app.get('/all', handlers.get_users);
 
 app.post('/login', handlers.check_user);
-//app.post('/login', handlers.check_pass);
 
-// регистрация пользователя 
+// Реєстрація користувача
 app.post('/signup', handlers.add_user);
 
-// ограничение доступа к контенту на основе авторизации 
-app.get('/check', function (req, res) {
+// Обмеження доступу до контенту на основі авторизації
+app.get('/check', (req, res) => {
     if (req.session.username) {
-        res.send('hello, user ' + req.session.username);
+        res.send(`Привіт, користувачу ${req.session.username}`);
     } else {
-        res.send('Not logged in(');
+        res.send('Ви не авторизовані (');
     }
-
 });
 
-app.listen(port, function () {
-    console.log('app running on port ' + port);
-})
+app.listen(port, () => {
+    console.log(`Додаток запущено на порту ${port}`);
+});
