@@ -1,62 +1,31 @@
 import express from 'express';
-import passport from 'passport';
-import { Strategy as LocalStrategy } from 'passport-local';
-import session from 'express-session';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+//import dotenv from 'dotenv';
 
 const app = express();
 const PORT = 3000;
-const SECRET_KEY = 'your_secret_key';
+const SECRET_KEY = 'your_secret_key'; // У реальному проекті використовуйте .env
 
-// Підтримка JSON (express.json замінює bodyParser у сучасних версіях)
 app.use(express.json());
 
-// Налаштування сесій
-app.use(session({ 
-    secret: 'secret', 
-    resave: false, 
-    saveUninitialized: false 
-}));
-
-// Ініціалізація Passport.js
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Підключення до MongoDB
-mongoose.connect('mongodb://localhost:27017/authDB')
+// Підключення до БД
+mongoose.connect('mongodb://127.0.0.1:27017/authDB') // Використовуйте 127.0.0.1 замість localhost для уникнення проблем з IPv6
     .then(() => console.log('MongoDB підключено'))
-    .catch(err => console.error('Помилка підключення до БД:', err));
+    .catch(err => console.error('Помилка БД:', err));
 
-// Схема для збереження токенів у базі (Whitelist токенів)
+// Схема токенів
 const tokenSchema = new mongoose.Schema({
     userId: Number,
     token: String,
-    createdAt: { type: Date, default: Date.now, expires: '1h' } // Автовидалення через годину
+    createdAt: { type: Date, default: Date.now, expires: '1h' }
 });
-
 const Token = mongoose.model('Token', tokenSchema);
 
-// Демонстраційні дані користувачів
-const users = [{ id: 1, username: 'admin', password: 'password' }];
+// Дані користувачів (імітація БД)
+const users = [{ id: 1, username: 'admin', password: 'password', role: 'admin' }];
 
-// Налаштування локальної стратегії Passport
-passport.use(new LocalStrategy((username, password, done) => {
-    const user = users.find(u => u.username === username && u.password === password);
-    if (!user) return done(null, false, { message: 'Невірні облікові дані' });
-    return done(null, user);
-}));
-
-// Серіалізація та десеріалізація користувача
-passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser((id, done) => {
-    const user = users.find(u => u.id === id);
-    done(null, user);
-});
-
-
-
-// Маршрут для входу та генерації токена
+// МАРШРУТ LOGIN
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
     const user = users.find(u => u.username === username && u.password === password);
@@ -65,64 +34,67 @@ app.post('/login', async (req, res) => {
         return res.status(401).json({ message: 'Невірні облікові дані' });
     }
     
-    // Створення JWT
     const token = jwt.sign(
-        { id: user.id, username: user.username }, 
+        { id: user.id, username: user.username, role: user.role }, 
         SECRET_KEY, 
         { expiresIn: '1h' }
     );
     
-    // Збереження токена в БД (дозволяє керувати активними сесіями)
+    // Зберігаємо токен у "White-list"
     await Token.create({ userId: user.id, token });
     
     res.json({ token });
 });
 
-/**
- * Middleware для перевірки токена (JWT + БД)
- */
+// MIDDLEWARE АУТЕНТИФІКАЦІЇ (JWT + DB Check)
 export const authenticateJWT = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader);
-
-    if (!token) {
-        return res.status(403).json({ message: 'Немає доступу (відсутній токен)' });
-    }
     
+    if (!authHeader) {
+        return res.status(401).json({ message: 'Відсутній заголовок авторизації' });
+    }
+
+    const token = authHeader.split(' ')[1]; // Очікуємо "Bearer TOKEN"
+
     try {
-        // Перевірка, чи існує токен у базі (чи не був він видалений при логауті)
+        // 1. Перевірка в БД (чи не був токен видалений при logout)
         const storedToken = await Token.findOne({ token });
         if (!storedToken) {
-            return res.status(403).json({ message: 'Токен недійсний або сесія завершена' });
+            return res.status(401).json({ message: 'Сесія завершена або токен недійсний' });
         }
         
-        // Валідація самого токена
-        jwt.verify(token, SECRET_KEY, (err, user) => {
-            if (err) return res.status(403).json({ message: 'Помилка валідації токена' });
-            req.user = user;
+        // 2. Валідація JWT
+        jwt.verify(token, SECRET_KEY, (err, decoded) => {
+            if (err) return res.status(403).json({ message: 'Токен прострочений або підроблений' });
+            req.user = decoded; // Додаємо дані користувача в запит
             next();
         });
     } catch (error) {
-        res.status(500).json({ message: 'Помилка сервера при перевірці' });
+        res.status(500).json({ message: 'Помилка сервера' });
     }
 };
 
-// Захищений маршрут
-app.get('/protected', authenticateJWT, (req, res) => {
-    res.json({ message: 'Це захищений маршрут', user: req.user });
+// MIDDLEWARE АВТОРИЗАЦІЇ (Перевірка ролі адміна)
+export const isAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') {
+        next();
+    } else {
+        res.status(403).json({ message: 'Доступ заборонено: потрібно бути адміністратором' });
+    }
+};
+
+// ЗАХИЩЕНІ МАРШРУТИ
+app.get('/admin/data', authenticateJWT, isAdmin, (req, res) => {
+    res.json({ message: 'Вітаємо, Адмін!', data: 'Чутливі дані' });
 });
 
-// Маршрут для виходу (видалення токена з БД)
 app.post('/logout', async (req, res) => {
     const authHeader = req.headers.authorization;
-    const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader);
-    
-    if (token) {
+    if (authHeader) {
+        const token = authHeader.split(' ')[1];
         await Token.deleteOne({ token });
     }
-    res.json({ message: 'Вихід виконано (токен анульовано)' });
+    res.json({ message: 'Вихід успішний' });
 });
 
-app.listen(PORT, () => {
-    console.log(`Сервер працює на http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Сервер: http://localhost:${PORT}`));
